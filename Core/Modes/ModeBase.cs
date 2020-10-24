@@ -24,12 +24,12 @@ namespace Core.Modes
             Setups.Databases repos = Setups.SetUpRepositories(baseConfig);
             ArgsParser argsParser = Setups.SetUpArgsParser(repos.UserRepo, pokedexData);
 
-            _commandProcessor = Setups.SetUpCommandProcessor(
-                loggerFactory, argsParser, repos, stopToken, baseConfig.Chat);
-
             _chat = new TwitchChat(loggerFactory, SystemClock.Instance, baseConfig.Chat, repos.UserRepo);
             _chat.IncomingMessage += MessageReceived;
             _commandResponder = new CommandResponder(_chat);
+
+            _commandProcessor = Setups.SetUpCommandProcessor(
+                loggerFactory, argsParser, repos, stopToken, baseConfig.Chat, _chat);
         }
 
         private async void MessageReceived(object? sender, MessageEventArgs e) =>
