@@ -4,19 +4,21 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Core.Configuration;
+using Core.Moderation;
 using Microsoft.Extensions.Logging;
 using NodaTime;
 using Persistence.Models;
 using Persistence.Repos;
 using TwitchLib.Client;
 using TwitchLib.Client.Events;
+using TwitchLib.Client.Extensions;
 using TwitchLib.Client.Models;
 using TwitchLib.Communication.Clients;
 using TwitchLib.Communication.Models;
 
 namespace Core.Chat
 {
-    public sealed class TwitchChat : IChat
+    public sealed class TwitchChat : IChat, IExecutor
     {
         public event EventHandler<MessageEventArgs> IncomingMessage = null!;
         /// Twitch Messaging Interface (TMI, the somewhat IRC-compatible protocol twitch uses) maximum message length.
@@ -156,31 +158,40 @@ namespace Core.Chat
         private async void MessageReceived(object? sender, OnMessageReceivedArgs e)
         {
             _logger.LogDebug($"<#{_ircChannel} {e.ChatMessage.Username}: {e.ChatMessage.Message}");
-            await AnyMessageReceived(e.ChatMessage, e.ChatMessage.Message, MessageSource.Chat);
+            User user = await _userRepo.RecordUser(GetUserInfoFromTwitchMessage(e.ChatMessage));
+            var message = new Message(user, e.ChatMessage.Message, MessageSource.Chat)
+            {
+                Details = new MessageDetails(
+                    MessageId: e.ChatMessage.Id,
+                    IsAction: e.ChatMessage.IsMe,
+                    IsStaff: e.ChatMessage.IsBroadcaster || e.ChatMessage.IsModerator
+                )
+            };
+            IncomingMessage?.Invoke(this, new MessageEventArgs(message));
         }
 
         private async void WhisperReceived(object? sender, OnWhisperReceivedArgs e)
         {
             _logger.LogDebug($"<@{e.WhisperMessage.Username}: {e.WhisperMessage.Message}");
-            await AnyMessageReceived(e.WhisperMessage, e.WhisperMessage.Message, MessageSource.Whisper);
+            User user = await _userRepo.RecordUser(GetUserInfoFromTwitchMessage(e.WhisperMessage));
+            var message = new Message(user, e.WhisperMessage.Message, MessageSource.Whisper)
+            {
+                Details = new MessageDetails(MessageId: null, IsAction: false, IsStaff: false)
+            };
+            IncomingMessage?.Invoke(this, new MessageEventArgs(message));
         }
 
-        private async Task AnyMessageReceived(
-            TwitchLibMessage twitchLibMessage,
-            string messageText,
-            MessageSource source)
+        private UserInfo GetUserInfoFromTwitchMessage(TwitchLibMessage message)
         {
-            string? colorHex = twitchLibMessage.ColorHex;
-            User user = await _userRepo.RecordUser(new UserInfo(
-                id: twitchLibMessage.UserId,
-                twitchDisplayName: twitchLibMessage.DisplayName,
-                simpleName: twitchLibMessage.Username,
+            string? colorHex = message.ColorHex;
+            return new UserInfo(
+                id: message.UserId,
+                twitchDisplayName: message.DisplayName,
+                simpleName: message.Username,
                 color: string.IsNullOrEmpty(colorHex) ? null : colorHex.TrimStart('#'),
                 fromMessage: true,
                 updatedAt: _clock.GetCurrentInstant()
-            ));
-            var message = new Message(user, messageText, source);
-            IncomingMessage?.Invoke(this, new MessageEventArgs(message));
+            );
         }
 
         public void Dispose()
@@ -193,6 +204,18 @@ namespace Core.Chat
             _twitchClient.OnMessageReceived -= MessageReceived;
             _twitchClient.OnWhisperReceived -= WhisperReceived;
             _logger.LogDebug("twitch chat is now fully shut down.");
+        }
+
+        public async Task DeleteMessage(string messageId)
+        {
+            await Task.Run(() => _twitchClient.SendMessage(_ircChannel, ".delete " + messageId));
+        }
+
+        public async Task Timeout(User user, string? message, Duration duration)
+        {
+            await Task.Run(() =>
+                _twitchClient.TimeoutUser(_ircChannel, user.SimpleName, duration.ToTimeSpan(),
+                    message ?? "no timeout reason was given"));
         }
     }
 }

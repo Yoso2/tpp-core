@@ -7,6 +7,7 @@ using Core.Chat;
 using Core.Commands;
 using Core.Commands.Definitions;
 using Core.Configuration;
+using Core.Moderation;
 using Microsoft.Extensions.Logging;
 using NodaTime;
 
@@ -17,6 +18,7 @@ namespace Core.Modes
         private readonly CommandProcessor _commandProcessor;
         private readonly IChat _chat;
         private readonly ICommandResponder _commandResponder;
+        private readonly IModerator _moderator;
 
         public ModeBase(ILoggerFactory loggerFactory, BaseConfig baseConfig, StopToken stopToken)
         {
@@ -27,9 +29,12 @@ namespace Core.Modes
             _commandProcessor = Setups.SetUpCommandProcessor(
                 loggerFactory, argsParser, repos, stopToken, baseConfig.Chat);
 
-            _chat = new TwitchChat(loggerFactory, SystemClock.Instance, baseConfig.Chat, repos.UserRepo);
+            TwitchChat twitchChat = new(loggerFactory, SystemClock.Instance, baseConfig.Chat, repos.UserRepo);
+            _chat = twitchChat;
             _chat.IncomingMessage += MessageReceived;
             _commandResponder = new CommandResponder(_chat);
+
+            _moderator = new Moderator(loggerFactory.CreateLogger<Moderator>(), twitchChat);
         }
 
         private async void MessageReceived(object? sender, MessageEventArgs e) =>
@@ -37,6 +42,14 @@ namespace Core.Modes
 
         private async Task ProcessIncomingMessage(Message message)
         {
+            bool isOk = message.Details.IsStaff
+                        || message.MessageSource != MessageSource.Chat
+                        || await _moderator.Check(message);
+            if (!isOk)
+            {
+                return;
+            }
+
             string[] parts = message.MessageText.Split(" ");
             string? firstPart = parts.FirstOrDefault();
             string? commandName = firstPart switch

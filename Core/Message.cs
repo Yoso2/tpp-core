@@ -8,17 +8,13 @@ namespace Core
         Whisper,
     }
 
-    public class Message
-    {
-        public User User { get; }
-        public string MessageText { get; }
-        public MessageSource MessageSource { get; }
+    public sealed record MessageDetails(string? MessageId, bool IsAction, bool IsStaff);
 
-        public Message(User user, string messageText, MessageSource messageSource)
-        {
-            User = user;
-            MessageText = messageText;
-            MessageSource = messageSource;
-        }
+    public sealed record Message(
+        User User,
+        string MessageText,
+        MessageSource MessageSource)
+    {
+        public MessageDetails Details { get; init; } = new(MessageId: null, IsAction: false, IsStaff: false);
     }
 }
