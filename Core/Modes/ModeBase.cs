@@ -22,6 +22,7 @@ namespace Core.Modes
 
         public ModeBase(ILoggerFactory loggerFactory, BaseConfig baseConfig, StopToken stopToken)
         {
+            IClock clock = SystemClock.Instance;
             PokedexData pokedexData = PokedexData.Load();
             Setups.Databases repos = Setups.SetUpRepositories(baseConfig);
             ArgsParser argsParser = Setups.SetUpArgsParser(repos.UserRepo, pokedexData);
@@ -29,12 +30,12 @@ namespace Core.Modes
             _commandProcessor = Setups.SetUpCommandProcessor(
                 loggerFactory, argsParser, repos, stopToken, baseConfig.Chat);
 
-            TwitchChat twitchChat = new(loggerFactory, SystemClock.Instance, baseConfig.Chat, repos.UserRepo);
+            TwitchChat twitchChat = new(loggerFactory, clock, baseConfig.Chat, repos.UserRepo);
             _chat = twitchChat;
             _chat.IncomingMessage += MessageReceived;
             _commandResponder = new CommandResponder(_chat);
 
-            _moderator = new Moderator(loggerFactory.CreateLogger<Moderator>(), twitchChat);
+            _moderator = new Moderator(loggerFactory.CreateLogger<Moderator>(), twitchChat, repos.ModLogRepo, clock);
         }
 
         private async void MessageReceived(object? sender, MessageEventArgs e) =>

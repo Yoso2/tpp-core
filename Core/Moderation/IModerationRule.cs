@@ -2,6 +2,7 @@ namespace Core.Moderation
 {
     public interface IModerationRule
     {
+        public string Id { get; }
         public RuleResult Check(Message message);
     }
 

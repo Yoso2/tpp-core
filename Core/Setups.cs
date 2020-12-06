@@ -69,21 +69,12 @@ namespace Core
             return commandProcessor;
         }
 
-        public class Databases
-        {
-            public IUserRepo UserRepo { get; }
-            public IBadgeRepo BadgeRepo { get; }
-            public IBank<User> PokeyenBank { get; }
-            public IBank<User> TokensBank { get; }
-
-            public Databases(IUserRepo userRepo, IBadgeRepo badgeRepo, IBank<User> pokeyenBank, IBank<User> tokensBank)
-            {
-                UserRepo = userRepo;
-                BadgeRepo = badgeRepo;
-                PokeyenBank = pokeyenBank;
-                TokensBank = tokensBank;
-            }
-        }
+        public record Databases(
+            IUserRepo UserRepo,
+            IBadgeRepo BadgeRepo,
+            IBank<User> PokeyenBank,
+            IBank<User> TokensBank,
+            IModLogRepo ModLogRepo);
 
         public static Databases SetUpRepositories(BaseConfig baseConfig)
         {
@@ -113,10 +104,11 @@ namespace Core
             tokenBank.AddReservedMoneyChecker(
                 new PersistedReservedMoneyCheckers(mongoDatabase).AllDatabaseReservedTokens);
             return new Databases(
-                userRepo: userRepo,
-                badgeRepo: badgeRepo,
-                pokeyenBank: pokeyenBank,
-                tokensBank: tokenBank);
+                UserRepo: userRepo,
+                BadgeRepo: badgeRepo,
+                PokeyenBank: pokeyenBank,
+                TokensBank: tokenBank,
+                ModLogRepo: new ModLogRepo(mongoDatabase));
         }
     }
 }
