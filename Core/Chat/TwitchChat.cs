@@ -164,7 +164,9 @@ namespace Core.Chat
                 Details = new MessageDetails(
                     MessageId: e.ChatMessage.Id,
                     IsAction: e.ChatMessage.IsMe,
-                    IsStaff: e.ChatMessage.IsBroadcaster || e.ChatMessage.IsModerator
+                    IsStaff: e.ChatMessage.IsBroadcaster || e.ChatMessage.IsModerator,
+                    Emotes: e.ChatMessage.EmoteSet.Emotes
+                        .Select(em => new Emote(em.Id, em.Name, em.StartIndex, em.EndIndex)).ToImmutableList()
                 )
             };
             IncomingMessage?.Invoke(this, new MessageEventArgs(message));
@@ -176,7 +178,13 @@ namespace Core.Chat
             User user = await _userRepo.RecordUser(GetUserInfoFromTwitchMessage(e.WhisperMessage));
             var message = new Message(user, e.WhisperMessage.Message, MessageSource.Whisper)
             {
-                Details = new MessageDetails(MessageId: null, IsAction: false, IsStaff: false)
+                Details = new MessageDetails(
+                    MessageId: null,
+                    IsAction: false,
+                    IsStaff: false,
+                    Emotes: e.WhisperMessage.EmoteSet.Emotes
+                        .Select(em => new Emote(em.Id, em.Name, em.StartIndex, em.EndIndex)).ToImmutableList()
+                )
             };
             IncomingMessage?.Invoke(this, new MessageEventArgs(message));
         }
