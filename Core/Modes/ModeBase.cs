@@ -35,7 +35,14 @@ namespace Core.Modes
             _chat.IncomingMessage += MessageReceived;
             _commandResponder = new CommandResponder(_chat);
 
-            _moderator = new Moderator(loggerFactory.CreateLogger<Moderator>(), twitchChat, repos.ModLogRepo, clock);
+            IImmutableList<IModerationRule> rules = ImmutableList.Create<IModerationRule>(
+                new BannedUrlsRule(),
+                new SpambotRule(),
+                new EmoteRule(),
+                new CopypastaRule(clock),
+                new UnicodeCharacterCategoryRule());
+            ILogger<Moderator> moderatorLogger = loggerFactory.CreateLogger<Moderator>();
+            _moderator = new Moderator(moderatorLogger, twitchChat, rules, repos.ModLogRepo, clock);
         }
 
         private async void MessageReceived(object? sender, MessageEventArgs e) =>
