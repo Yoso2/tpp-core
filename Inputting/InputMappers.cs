@@ -40,6 +40,8 @@ namespace Inputting
         private readonly float _fps;
 
         /// <summary>
+        /// TODO trigger toggles
+        /// TODO eternal holds
         /// </summary>
         /// <param name="fps">Required for games that don't run at 60fps to correctly compute the frame timings.</param>
         public DefaultTppInputMapper(float fps = 60)

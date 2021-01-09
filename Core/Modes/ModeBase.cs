@@ -18,6 +18,8 @@ namespace Core.Modes
         private readonly IChat _chat;
         private readonly ICommandResponder _commandResponder;
 
+        public event EventHandler<Message> ChatMessageReceived = null!;
+
         public ModeBase(ILoggerFactory loggerFactory, BaseConfig baseConfig, StopToken stopToken)
         {
             PokedexData pokedexData = PokedexData.Load();
@@ -30,6 +32,11 @@ namespace Core.Modes
             _chat = new TwitchChat(loggerFactory, SystemClock.Instance, baseConfig.Chat, repos.UserRepo);
             _chat.IncomingMessage += MessageReceived;
             _commandResponder = new CommandResponder(_chat);
+        }
+
+        public void InstallAdditionalCommand(Command command)
+        {
+            _commandProcessor.InstallCommand(command);
         }
 
         private async void MessageReceived(object? sender, MessageEventArgs e) =>
@@ -54,6 +61,7 @@ namespace Core.Modes
                     .Process(commandName, parts.Skip(1).ToImmutableList(), message);
                 await _commandResponder.ProcessResponse(message, result);
             }
+            ChatMessageReceived?.Invoke(this, message);
         }
 
         public void Start()
